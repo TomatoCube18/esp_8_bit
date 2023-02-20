@@ -68,25 +68,25 @@ int log_print(const char *string)
    return 0;
 }
 
-int log_printf(const char *format, ... )
-{
-   /* don't allocate on stack every call */
-   static char buffer[1024 + 1];
-   va_list arg;
+// int log_printf(const char *format, ... )
+// {
+//    /* don't allocate on stack every call */
+//    static char buffer[1024 + 1];
+//    va_list arg;
 
-   va_start(arg, format);
+//    va_start(arg, format);
 
-   if (NULL != log_func)
-   {
-      vsprintf(buffer, format, arg);
-      log_func(buffer);
-   }
+//    if (NULL != log_func)
+//    {
+//       vsprintf(buffer, format, arg);
+//       log_func(buffer);
+//    }
 
-//   vfprintf(errorlog, format, arg);
-   va_end(arg);
+// //   vfprintf(errorlog, format, arg);
+//    va_end(arg);
 
-   return 0; /* should be number of chars written */
-}
+//    return 0; /* should be number of chars written */
+// }
 
 #else /* !NOFRENDO_DEBUG */
 
@@ -106,12 +106,12 @@ int log_print(const char *string)
    return 0;
 }
 
-int log_printf(const char *format, ... )
-{
-   UNUSED(format);
+// int log_printf(const char *format, ... )
+// {
+//    UNUSED(format);
 
-   return 0; /* should be number of chars written */
-}
+//    return 0; /* should be number of chars written */
+// }
 #endif /* !NOFRENDO_DEBUG */
 
 void log_chain_logfunc(int (*func)(const char *string))
@@ -124,10 +124,10 @@ void log_assert(int expr, int line, const char *file, char *msg)
    if (expr)
       return;
 
-   if (NULL != msg)
-      log_printf("ASSERT: line %d of %s, %s\n", line, file, msg);
-   else
-      log_printf("ASSERT: line %d of %s\n", line, file);
+   // if (NULL != msg)
+   //    log_printf("ASSERT: line %d of %s, %s\n", line, file, msg);
+   // else
+   //    log_printf("ASSERT: line %d of %s\n", line, file);
 
    //asm("break.n 1");
 //   exit(-1);
