@@ -17,6 +17,8 @@
 /*Choose one of the following emulators: EMU_NES,EMU_SMS,EMU_ATARI*/
 /******************************************************************/
 #define EMULATOR EMU_NES
+//#define EMULATOR EMU_SMS
+//#define EMULATOR EMU_ATARI
 
 /******************************************************************/
 /*Many emus work fine on a single core (S2), file system access can cause a little flickering*/
@@ -58,7 +60,7 @@
 
 // Define this to enable SD card with FAT 8.3 filenames
 // Note that each emulator has its own folder. Place ROMs under /nonfredo for NES, /smsplus for SMS and /atari800 for atari
-//#define USE_SD_CARD
+#define USE_SD_CARD
 // SD card pin mapping
 #define CONFIG_SD_CS 15
 #define CONFIG_SD_MOSI 13
@@ -68,12 +70,13 @@
 /****************************************************************/
 /*Controller support*/
 /****************************************************************/
-#define WEBTV_KEYBOARD
-#define RETCON_CONTROLLER
-#define FLASHBACK_CONTROLLER
+//#define WEBTV_KEYBOARD
+//#define RETCON_CONTROLLER
+//#define FLASHBACK_CONTROLLER
 //#define APPLE_TV_CONTROLLER
-#define NES_CONTROLLER	//Enable only NES OR SNES not both!
+//#define NES_CONTROLLER	//Enable only NES OR SNES not both!
 //#define SNES_CONTROLLER	//Enable only NES OR SNES not both!
+#define USB_CONTROLLER
 
 /****************************************************************/
 /*Video levels*/
