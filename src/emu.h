@@ -94,6 +94,8 @@ public:
     int cc_width;           // number of samples per color clock
     int flavor;             // color flavor (cleaner?);
 
+    uint8_t io19;
+
     Emu(const char* n, int w, int h, int standard, int aformat, int cc, int flavor);
     virtual ~Emu();
 
@@ -135,6 +137,7 @@ extern "C" uint8_t* map_file(const char* path, int len);
 extern "C" void unmap_file(uint8_t* ptr);
 extern "C" FILE* mkfile(const char* path);
 extern "C" int unpack(const char* dst_path, const uint8_t* d, int len);
+extern "C" void reformat();
 
 void audio_write_16(const int16_t* s, int len, int channels);
 int get_hid_ir(uint8_t* dst);

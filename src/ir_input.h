@@ -28,6 +28,18 @@ uint8_t _ir_count = 0;
 uint8_t _keyDown = 0;
 uint8_t _keyUp = 0;
 
+
+uint8_t  uartRxBuff[512];
+int  rxPos = 0;
+int  cmdLength = 0;
+uint8_t  cmdType = 0;
+int8_t  gpadSM = 0;
+unsigned long lastUSBRead;
+String deviceType[] = {"UNKNOWN", "POINTER", "MOUSE", "RESERVED", "JOYSTICK", "GAMEPAD", "KEYBOARD", "KEYPAD", "MULTI_AXIS", "SYSTEM"};
+
+uint16_t gamePads[2]; // Emulation Mapping
+void filterCommand(int buffLength, unsigned char *msgbuffer);
+
 void IRAM_ATTR ir_event(uint8_t ticks, uint8_t value); // t is HSYNCH ticks, v is value
 
 inline void IRAM_ATTR ir_sample()
@@ -41,6 +53,9 @@ inline void IRAM_ATTR ir_sample()
     }
     if (_ir_count != 0xFF)
         _ir_count++;
+
+    
+
 }
 
 class IRState {
@@ -187,6 +202,67 @@ int get_hid_snes(uint8_t* dst)
 	_snes.set(1,buttonsB,0); // no repeat period
   
   return _snes.get_hid(dst);		
+}
+#endif
+
+
+
+
+//==================================================================
+//Classic hard wired SNES controllers
+//==================================================================
+#ifdef USB_CONTROLLER
+
+IRState _usbnes;
+int get_usb_snes(uint8_t* dst)
+{
+    // CH559 Uart Reading 
+
+      // if (Serial1.available()) {
+        while (Serial1.available()) {
+            uartRxBuff[rxPos] = Serial1.read();
+            
+            if (rxPos == 0 && uartRxBuff[rxPos] == 0xFD) {
+              cmdType = 1;
+            } 
+
+            if ((rxPos > 0) && (cmdType) && (uartRxBuff[rxPos] == '\n')) {
+              gamePads[0] = uartRxBuff[1] << 8 | uartRxBuff[2];
+              gamePads[1] = uartRxBuff[3] << 8 | uartRxBuff[4];
+              rxPos = 0;
+              cmdType = 0;
+
+            }
+            else if  (cmdType == 0 && uartRxBuff[rxPos] == '\n') {
+              rxPos = 0;
+              cmdType = 0;
+            } else if (rxPos >= 511) {
+              rxPos = 0;
+              cmdType = 0;
+        //      break;
+            }
+            else {
+              rxPos++;
+            } 
+        }
+      // } 
+      // else {
+          Serial1.print('P');
+      // }
+
+
+
+    uint16_t buttonsA = gamePads[0];
+    uint16_t buttonsB = gamePads[1];
+  
+    //Setup Controller A
+    if (buttonsA == (GENERIC_LEFT | GENERIC_SELECT)) buttonsA |= GENERIC_OTHER; //Press LEFT & SELECT to open file menu
+    _usbnes.set(0,buttonsA,0); // no repeat period
+
+    //Setup Controller B
+    _usbnes.set(1,buttonsB,0); // no repeat period
+  
+  return _usbnes.get_hid(dst);        
 }
 #endif
 
@@ -767,9 +843,141 @@ int get_hid_ir(uint8_t* dst)
     if (n = get_hid_snes(dst))
         return n;
 #endif
+#ifdef USB_CONTROLLER
+    if (n = get_usb_snes(dst))
+        return n;
+#endif
 #ifdef WEBTV_KEYBOARD
         return get_hid_webtv(dst);
 #endif
 	return 0;
 }
 #endif
+
+
+
+#define MSG_TYPE_CONNECTED      0x01
+#define MSG_TYPE_DISCONNECTED   0x02
+#define MSG_TYPE_ERROR          0x03
+#define MSG_TYPE_DEVICE_POLL    0x04
+#define MSG_TYPE_DEVICE_STRING  0x05
+#define MSG_TYPE_DEVICE_INFO    0x06
+#define MSG_TYPE_HID_INFO       0x07
+#define MSG_TYPE_STARTUP        0x08
+
+
+
+void filterCommand(int buffLength, unsigned char *msgbuffer) {
+  int cmdLength = buffLength;
+  unsigned char msgType = msgbuffer[3];
+  unsigned char devType = msgbuffer[4];
+  unsigned char device = msgbuffer[5];
+  unsigned char endpoint = msgbuffer[6];
+  unsigned char idVendorL = msgbuffer[7];
+  unsigned char idVendorH = msgbuffer[8];
+  unsigned char idProductL = msgbuffer[9];
+  unsigned char idProductH = msgbuffer[10];
+  switch (msgType) {
+    case MSG_TYPE_CONNECTED:
+      Serial.print("Device Connected on port");
+      Serial.println(device);
+      break;
+    case MSG_TYPE_DISCONNECTED:
+      Serial.print("Device Disconnected on port");
+      Serial.println(device);
+      break;
+    case MSG_TYPE_ERROR:
+      Serial.print("Device Error ");
+      Serial.print(device);
+      Serial.print(" on port ");
+      Serial.println(devType);
+      break;
+    case MSG_TYPE_DEVICE_POLL:
+//      Serial.print("Device HID Data from port: ");
+//      Serial.print(device);
+//      Serial.print(" , Length: ");
+//      Serial.print(cmdLength);
+//      Serial.print(" , Type: ");
+//      Serial.print (deviceType[devType]);
+//      Serial.print(" , ID: ");
+//      for (int j = 0; j < 4; j++) {
+//      Serial.print("0x");
+//      Serial.print(msgbuffer[j + 7], HEX);
+//      Serial.print(" ");
+//      }
+//      Serial.print(" ,  ");
+//      for (int j = 0; j < cmdLength; j++) {
+//      Serial.print("0x");
+//      Serial.print(msgbuffer[j + 11], HEX);
+//      Serial.print(" ");
+//      }
+//      Serial.println();
+
+        if ((msgbuffer[16] & 0x0F) == 0x0F) {
+            if (device == 0) { // GamePad 0
+    
+              gamePads[0] = ((msgbuffer[14] < 0x3F) ? GENERIC_LEFT : (msgbuffer[14] > 0xBF) ? GENERIC_RIGHT : 0x00) | // Left+Right
+                            ((msgbuffer[15] < 0x3F) ? GENERIC_UP : (msgbuffer[15] > 0xBF) ? GENERIC_DOWN : 0x00) |    // Up+Down
+                            ((msgbuffer[16] & 0x20) > 0 ? (GENERIC_FIRE | GENERIC_FIRE_A): 0x00) |                     // Button A
+                            ((msgbuffer[16] & 0x40) > 0 ? (GENERIC_FIRE_B): 0x00) |                                    // Button B 
+                            ((msgbuffer[16] & 0x10) > 0 ? (GENERIC_FIRE_X): 0x00) |                                    // Button X 
+                            ((msgbuffer[16] & 0x80) > 0 ? (GENERIC_FIRE_C): 0x00) |                                    // Button Y
+                            ((msgbuffer[17] & 0x01) > 0 ? (GENERIC_FIRE_Y): 0x00) |                                    // Button L 
+                            ((msgbuffer[17] & 0x02) > 0 ? (GENERIC_FIRE_Z): 0x00) |                                    // Button R 
+                            ((msgbuffer[17] & 0x20) > 0 ? (GENERIC_START): 0x00) |                                     // Button Start 
+                            ((msgbuffer[17] & 0x10) > 0 ? (GENERIC_SELECT): 0x00);                                     // Button Select 
+              
+            } else {
+    
+              gamePads[1] = ((msgbuffer[14] < 0x3F) ? GENERIC_LEFT : (msgbuffer[14] > 0xBF) ? GENERIC_RIGHT : 0x00) | // Left+Right
+                            ((msgbuffer[15] < 0x3F) ? GENERIC_UP : (msgbuffer[15] > 0xBF) ? GENERIC_DOWN : 0x00) |    // Up+Down
+                            ((msgbuffer[16] & 0x20) > 0 ? (GENERIC_FIRE | GENERIC_FIRE_A): 0x00) |                     // Button A
+                            ((msgbuffer[16] & 0x40) > 0 ? (GENERIC_FIRE_B): 0x00) |                                    // Button B 
+                            ((msgbuffer[16] & 0x10) > 0 ? (GENERIC_FIRE_X): 0x00) |                                    // Button X 
+                            ((msgbuffer[16] & 0x80) > 0 ? (GENERIC_FIRE_C): 0x00) |                                    // Button Y
+                            ((msgbuffer[17] & 0x01) > 0 ? (GENERIC_FIRE_Y): 0x00) |                                    // Button L 
+                            ((msgbuffer[17] & 0x02) > 0 ? (GENERIC_FIRE_Z): 0x00) |                                    // Button R 
+                            ((msgbuffer[17] & 0x20) > 0 ? (GENERIC_START): 0x00) |                                     // Button Start 
+                            ((msgbuffer[17] & 0x10) > 0 ? (GENERIC_SELECT): 0x00);                                     // Button Select
+              
+            }
+        }
+      break;
+    case MSG_TYPE_DEVICE_STRING:
+      Serial.print("Device String port ");
+      Serial.print(devType);
+      Serial.print(" Name: ");
+      for (int j = 0; j < cmdLength; j++)
+        Serial.write(msgbuffer[j + 11]);
+      Serial.println();
+      break;
+    case MSG_TYPE_DEVICE_INFO:
+      Serial.print("Device info from port");
+      Serial.print(device);
+      Serial.print(", Descriptor: ");
+      for (int j = 0; j < cmdLength; j++) {
+        Serial.print("0x");
+        Serial.print(msgbuffer[j + 11], HEX);
+        Serial.print(" ");
+      }
+      Serial.println();
+      break;
+    case MSG_TYPE_HID_INFO:
+      Serial.print("HID info from port");
+      Serial.print(device);
+      Serial.print(", Descriptor: ");
+      for (int j = 0; j < cmdLength; j++) {
+        Serial.print("0x");
+        Serial.print(msgbuffer[j + 11], HEX);
+        Serial.print(" ");
+      }
+      Serial.println();
+      break;
+    case MSG_TYPE_STARTUP:
+      Serial.println("USB host ready");
+      break;
+
+  }
+}
+
+

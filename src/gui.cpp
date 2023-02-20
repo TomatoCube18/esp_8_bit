@@ -928,6 +928,14 @@ public:
 
         int recent = find_file(get_pref("recent"));
 
+        
+        if (_emu->io19 == 0)
+        {
+            recent = -1;
+            _emu->io19 = 1;
+        }
+
+
         for (int i = 0; i < 2; i++)
             _disks[i] = find_disk(i);
 
