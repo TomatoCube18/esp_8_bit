@@ -13,6 +13,9 @@
 ** ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS
 ** SOFTWARE.
 */
+// Mac Fix
+// sed -i -e 's/=python /=python3 /g' ~/Library/Arduino15/packages/esp32/hardware/esp32/*/platform.txt
+// Arduino 1.8.13 and the 1.0.4 esp32 board manager lib -> ESP32 Dev Module, Default 4MB with Spiffs
 
 #include "esp_system.h"
 #include "esp_int_wdt.h"
@@ -57,6 +60,7 @@ uint32_t _frame_time = 0;
 uint32_t _drawn = 1;
 bool _inited = false;
 
+
 void emu_init()
 {
     std::string folder = "/" + _emu->name;
@@ -75,13 +79,15 @@ void emu_loop()
     _frame_time = xthal_get_ccount() - t;
     _lines = _emu->video_buffer();
     _drawn++;
+    
 }
 
 // dual core mode runs emulator on comms core
 void emu_task(void* arg)
 {
     printf("emu_task %s running on core %d at %dHz\n",
-      _emu->name.c_str(),xPortGetCoreID(),rtc_clk_cpu_freq_value(rtc_clk_cpu_freq_get()));
+//      _emu->name.c_str(),xPortGetCoreID(),rtc_clk_freq_cal(rtc_clk_apb_freq_get()));
+    _emu->name.c_str(),xPortGetCoreID(),rtc_clk_cpu_freq_value(rtc_clk_cpu_freq_get()));
     emu_init();
     for (;;)
       emu_loop();
@@ -138,14 +144,23 @@ return e;
 
 void setup()
 { 
+  pinMode(19,INPUT);
+  
   int silicon_version = (REG_READ(EFUSE_BLK0_RDATA3_REG) >> 15) & 1;
   if (silicon_version == 0)
     printf("Warning this revision of the chip has an issue with the APLL and will not work properly!\n");
       
   rtc_clk_cpu_freq_set(RTC_CPU_FREQ_240M);  
+  Serial1.begin(1000000, SERIAL_8N1, 16, 17); // Attach UART to CH559
+  
   mount_filesystem();                       // mount the filesystem!
   _emu = NewEmulator();                     // create the emulator!
   hid_init("emu32");                        // bluetooth hid on core 1!
+
+  _emu->io19 = (digitalRead(19) == LOW) ? 0: 1;
+  if (_emu->io19 == 0) {
+      reformat();
+  }
 
   #ifdef SINGLE_CORE
   emu_init();
@@ -189,10 +204,12 @@ void loop()
       _inited = true;
     } else {
       vTaskDelay(1);
+        
     }
   }
   #endif
-  
+
+    
   // update the bluetooth edr/hid stack
   hid_update();
 
