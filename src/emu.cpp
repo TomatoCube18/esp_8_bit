@@ -209,6 +209,12 @@ uint8_t* map_file(const char* path, int len)
     return _fs.mmap(file);
 }
 
+void reformat() 
+{
+    CrapFS _fs;
+    _fs.reformat();
+}
+
 void unmap_file(uint8_t* ptr)
 {
     if (_file_handle)

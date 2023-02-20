@@ -587,6 +587,7 @@ void IRAM_ATTR video_isr(volatile void* vbuf)
     audio_sample(s);
     //audio_sample(_sin64[_x++ & 0x3F]);
 
+
 #ifdef IR_PIN
     ir_sample();
 #endif
@@ -612,6 +613,8 @@ void IRAM_ATTR video_isr(volatile void* vbuf)
         _line_counter = 0;                      // frame is done
         _frame_counter++;
     }
+
+
 
     ISR_END();
 }
